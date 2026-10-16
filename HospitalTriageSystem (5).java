@@ -1,171 +1,226 @@
-import java.util.Scanner;
 
-class HospitalTriageSystem {
+import java.util.*;
+import java.io.IOException;
+import java.nio.file.*;
+import java.util.stream.Collectors;
 
-    // Constants and lookup arrays (index 1 = Critical, 2 = Serious, 3 = Normal)
-    static final int MAX = 20, CRITICAL = 1, SERIOUS = 2, NORMAL = 3;
-    static final String[] LEVEL_NAMES = {"", "Critical", "Serious", "Normal"};
-    static final String[] DOCTORS = {"", "Emergency Specialist", "Senior Doctor",
-            "General Physician"};
-    static final String[] MESSAGES = {"", "Patient needs immediate treatment.",
-            "Patient needs urgent treatment.",
-            "Patient can wait for normal treatment."};
-    static final String[] COMPLAINTS = {"Chest pain", "Difficulty in breathing",
-            "Severe bleeding", "Broken bone", "High fever", "Minor cut or injury",
-            "General checkup"};
-    static final int[] BEDS = {0, 1, 2, 3};   // beds available for each level
+public class Main {
 
-    // Arrays to store the patient records
-    static String[] names = new String[MAX], complaints = new String[MAX];
-    static int[] ages = new int[MAX], levels = new int[MAX];
-    static double[] temps = new double[MAX];
-    static Scanner sc = new Scanner(System.in);
+    static final int MAX = 20;
 
-    // Read a number in a range; try-catch handles wrong input
-    static double readNumber(String msg, double min, double max) {
-        while (true) {
-            System.out.print(msg);
-            try {
-                double value = Double.parseDouble(sc.nextLine().trim());
-                if (value >= min && value <= max) { return value; }
-                System.out.println("Enter a value from " + (int) min
-                        + " to " + (int) max);
-            } catch (NumberFormatException e) {
-                System.out.println("Invalid input. Please enter a number.");
-            }
+    static class Patient {
+        String name;
+        int age;
+        double temperature;
+        String complaint;
+        String level;
+
+        Patient(String name, int age, double temperature,
+                String complaint) {
+            this.name = name;
+            this.age = age;
+            this.temperature = temperature;
+            this.complaint = complaint;
+            this.level = findLevel(complaint, age, temperature);
         }
-    }
 
-    // Decide the emergency level from the complaint number
-    static int levelFromComplaint(int choice) {
-        switch (choice) {
-            case 1: case 2: case 3: return CRITICAL;
-            case 4: case 5:         return SERIOUS;
-            default:                return NORMAL;
-        }
-    }
-
-    // Raise the level for a very high fever, small children and elderly patients
-    static int adjustLevel(int level, int age, double temp) {
-        if (temp >= 104.0) { return CRITICAL; }
-        else if ((age < 5 || age >= 65) && level == NORMAL) { return SERIOUS; }
-        else { return level; }
-    }
-
-    static String feverStatus(double temp) {
-        if (temp < 97.0) { return "Low temperature"; }
-        else if (temp <= 99.5) { return "Normal temperature"; }
-        else if (temp <= 102.0) { return "Fever"; }
-        else { return "High fever"; }
-    }
-
-    // Time needed to treat one patient of the given level
-    static int treatmentMinutes(int level) {
-        switch (level) {
-            case CRITICAL: return 30;
-            case SERIOUS:  return 20;
-            default:       return 10;
-        }
-    }
-
-    static void registerPatient(int i) {
-        System.out.print("Enter patient name: ");
-        names[i] = sc.nextLine().trim();
-        if (names[i].isEmpty()) { names[i] = "Patient " + (i + 1); }
-        ages[i] = (int) readNumber("Enter age (0-120): ", 0, 120);
-        temps[i] = readNumber("Enter temperature in F (90-110): ", 90, 110);
-        for (int k = 0; k < COMPLAINTS.length; k++) {
-            System.out.println((k + 1) + ". " + COMPLAINTS[k]);
-        }
-        int choice = (int) readNumber("Select main complaint (1-7): ", 1, 7);
-        complaints[i] = COMPLAINTS[choice - 1];
-        levels[i] = adjustLevel(levelFromComplaint(choice), ages[i], temps[i]);
-        System.out.println("Emergency Status: " + LEVEL_NAMES[levels[i]]);
-    }
-
-    // Bubble sort on an index array: Critical patients come first
-    static int[] sortByPriority(int n) {
-        int[] order = new int[n];
-        for (int i = 0; i < n; i++) { order[i] = i; }
-        for (int i = 0; i < n - 1; i++) {
-            for (int j = 0; j < n - 1 - i; j++) {
-                if (levels[order[j]] > levels[order[j + 1]]) {
-                    int temp = order[j];
-                    order[j] = order[j + 1];
-                    order[j + 1] = temp;
-                }
-            }
-        }
-        return order;
-    }
-
-    static void showTreatmentList(int[] order, int n) {
-        int[] bedsUsed = new int[4];
-        int waitMinutes = 0;
-        System.out.println("\n===== TREATMENT ORDER (MOST URGENT FIRST) =====");
-        for (int k = 0; k < n; k++) {
-            int p = order[k];
-            int level = levels[p];
-            System.out.println("\nPriority " + (k + 1) + " : " + names[p]
-                    + " (Age " + ages[p] + ")");
-            System.out.println("Complaint       : " + complaints[p]);
-            System.out.println("Temperature     : " + temps[p] + " F ("
-                    + feverStatus(temps[p]) + ")");
-            System.out.println("Emergency Level : " + LEVEL_NAMES[level]);
-            System.out.println("Assigned Doctor : " + DOCTORS[level]);
-            System.out.println("Estimated Wait  : " + waitMinutes + " minutes");
-            if (bedsUsed[level] < BEDS[level]) {
-                bedsUsed[level]++;
-                System.out.println("Bed             : Bed allotted");
+        static String findLevel(String complaint, int age,
+                                double temperature) {
+            if (temperature >= 104 ||
+                complaint.equals("Chest pain") ||
+                complaint.equals("Difficulty breathing") ||
+                complaint.equals("Severe bleeding")) {
+                return "Critical";
+            } else if (complaint.equals("Broken bone") ||
+                       complaint.equals("High fever") ||
+                       age < 5 || age >= 65) {
+                return "Serious";
             } else {
-                System.out.println("Bed             : No free bed, please wait");
+                return "Normal";
             }
-            System.out.println(MESSAGES[level]);
-            waitMinutes += treatmentMinutes(level);
+        }
+
+        @Override
+        public String toString() {
+            return name + " | Age: " + age
+                    + " | Temp: " + temperature
+                    + " F | Complaint: " + complaint
+                    + " | Level: " + level;
         }
     }
 
-    static void showSummary(int n) {
-        int[] levelCount = new int[4];
-        int oldest = 0, hottest = 0;
-        double total = 0;
-        for (int i = 0; i < n; i++) {
-            levelCount[levels[i]]++;
-            total += temps[i];
-            if (ages[i] > ages[oldest]) { oldest = i; }
-            if (temps[i] > temps[hottest]) { hottest = i; }
+    static Scanner sc = new Scanner(System.in);
+    static ArrayList<Patient> patients = new ArrayList<>();
+
+    static final String FILE = "patients.txt";
+
+    static void registerPatient() {
+        System.out.print("Enter patient name: ");
+        String name = sc.nextLine().trim();
+
+        System.out.print("Enter age: ");
+        int age = Integer.parseInt(sc.nextLine());
+
+        System.out.print("Enter temperature in Fahrenheit: ");
+        double temp = Double.parseDouble(sc.nextLine());
+
+        String[] complaints = {
+            "Chest pain",
+            "Difficulty breathing",
+            "Severe bleeding",
+            "Broken bone",
+            "High fever",
+            "Minor injury",
+            "General checkup"
+        };
+
+        for (int i = 0; i < complaints.length; i++) {
+            System.out.println((i + 1) + ". " + complaints[i]);
         }
-        System.out.println("\n===== EMERGENCY ROOM SUMMARY =====");
-        System.out.println("Total patients      : " + n);
-        System.out.println("Critical patients   : " + levelCount[CRITICAL]);
-        System.out.println("Serious patients    : " + levelCount[SERIOUS]);
-        System.out.println("Normal patients     : " + levelCount[NORMAL]);
-        System.out.printf("Average temperature : %.1f F%n", total / n);
-        System.out.println("Highest temperature : " + names[hottest]
-                + " (" + temps[hottest] + " F)");
-        System.out.println("Oldest patient      : " + names[oldest]
-                + " (" + ages[oldest] + " years)");
-        if (levelCount[CRITICAL] > 0) {
-            System.out.println("ALERT: Critical patients need immediate attention!");
+
+        System.out.print("Select complaint (1-7): ");
+        int choice = Integer.parseInt(sc.nextLine());
+
+        if (name.isEmpty() || age < 0 || age > 120 ||
+            temp < 90 || temp > 110 ||
+            choice < 1 || choice > 7) {
+            System.out.println("Invalid patient details.");
+            return;
+        }
+
+        Patient p = new Patient(name, age, temp,
+                                complaints[choice - 1]);
+        patients.add(p);
+
+        System.out.println("Patient registered successfully!");
+        System.out.println("Emergency level: " + p.level);
+    }
+
+    static void displayPatients() {
+        if (patients.isEmpty()) {
+            System.out.println("No patients registered.");
+            return;
+        }
+
+        patients.stream()
+            .sorted(Comparator.comparingInt(p ->
+                p.level.equals("Critical") ? 1 :
+                p.level.equals("Serious") ? 2 : 3))
+            .forEach(System.out::println);
+    }
+
+    static void showSummary() {
+        Map<String, Long> counts = patients.stream()
+            .collect(Collectors.groupingBy(
+                p -> p.level, Collectors.counting()));
+
+        System.out.println("\n--- Emergency Summary ---");
+        System.out.println("Total patients: " + patients.size());
+        System.out.println("Critical: " +
+            counts.getOrDefault("Critical", 0L));
+        System.out.println("Serious: " +
+            counts.getOrDefault("Serious", 0L));
+        System.out.println("Normal: " +
+            counts.getOrDefault("Normal", 0L));
+
+        double average = patients.stream()
+            .mapToDouble(p -> p.temperature)
+            .average().orElse(0.0);
+
+        System.out.printf("Average temperature: %.1f F%n",
+                          average);
+    }
+
+    static void savePatients() {
+        List<String> lines = patients.stream()
+            .map(p -> p.name + "|" + p.age + "|"
+                + p.temperature + "|" + p.complaint
+                + "|" + p.level)
+            .collect(Collectors.toList());
+
+        try {
+            Files.write(Paths.get(FILE), lines);
+            System.out.println("Patient records saved to " + FILE);
+        } catch (IOException e) {
+            System.out.println("Unable to save patient records.");
+        }
+    }
+
+    static void readPatients() {
+        Path path = Paths.get(FILE);
+
+        try {
+            if (!Files.exists(path)) {
+                System.out.println("No saved patient file found.");
+                return;
+            }
+
+            List<String> lines = Files.readAllLines(path);
+            System.out.println("\n--- Saved Patient Records ---");
+
+            lines.forEach(System.out::println);
+
+        } catch (IOException e) {
+            System.out.println("Unable to read patient file.");
         }
     }
 
     public static void main(String[] args) {
-        System.out.println("===== HOSPITAL EMERGENCY ROOM TRIAGE SYSTEM =====");
-        int n = (int) readNumber("Number of patients (1-" + MAX + "): ", 1, MAX);
+        int choice;
 
-        for (int i = 0; i < n; i++) {
-            System.out.println("\n--- Patient " + (i + 1) + " of " + n + " ---");
-            registerPatient(i);
-        }
+        do {
+            System.out.println("\n===== HOSPITAL TRIAGE SYSTEM =====");
+            System.out.println("1. Register Patient");
+            System.out.println("2. Display Patients by Priority");
+            System.out.println("3. Show Summary");
+            System.out.println("4. Save Patient Records");
+            System.out.println("5. Read Saved Records");
+            System.out.println("6. Exit");
+            System.out.print("Enter choice: ");
 
-        int[] order = sortByPriority(n);
-        showTreatmentList(order, n);
-        showSummary(n);
+            try {
+                choice = Integer.parseInt(sc.nextLine());
 
-        System.out.println("\n=================================================");
-        System.out.println("   TRIAGE COMPLETED. THANK YOU. PROGRAM ENDED.");
-        System.out.println("=================================================");
+                switch (choice) {
+                    case 1:
+                        if (patients.size() < MAX) {
+                            registerPatient();
+                        } else {
+                            System.out.println("Patient limit reached.");
+                        }
+                        break;
+
+                    case 2:
+                        displayPatients();
+                        break;
+
+                    case 3:
+                        showSummary();
+                        break;
+
+                    case 4:
+                        savePatients();
+                        break;
+
+                    case 5:
+                        readPatients();
+                        break;
+
+                    case 6:
+                        System.out.println("Program ended.");
+                        break;
+
+                    default:
+                        System.out.println("Choose from 1 to 6.");
+                }
+
+            } catch (NumberFormatException e) {
+                System.out.println("Please enter a valid number.");
+                choice = 0;
+            }
+
+        } while (choice != 6);
+
         sc.close();
     }
 }
